@@ -16,22 +16,22 @@ class _WalkthroughScreenState extends State<WalkthroughScreen> {
     {
       "title": "Your Digital Alkansya is Here.", 
       "desc": "Welcome to My Pouch PH! Turn your savings habit into a visual journey and reach your financial dreams, one peso at a time.",
-      "image": "assets/walkthrough.jpg"
+      "image": "assets/WalkThrough_1.png"
     },
     {
       "title": "What are you saving for?",
       "desc": "Create a custom goal—whether it’s a new phone, a concert ticket, or an emergency fund. Set your target amount and upload a photo to keep your eyes on the prize.",
-      "image": "assets/walkthrough.jpg"
+      "image": "assets/WalkThrough_2.png"
     },
     {
       "title": "Track Every Contribution.",
       "desc": "Dropped a coin in your jar? Saved your allowance? Manually log your savings in seconds and watch your progress bar fill up. No bank linking required.",
-      "image": "assets/walkthrough.jpg"
+      "image": "assets/WalkThrough_3.png"
     },
     {
       "title": "Celebrate Your Wins!",
       "desc": "Stay consistent with motivational feedback. When you hit your target, unlock a special celebration screen. You earned it!",
-      "image": "assets/walkthrough.jpg"
+      "image": "assets/WalkThrough_4.png"
     },
   ];
 
