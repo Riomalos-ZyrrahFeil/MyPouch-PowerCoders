@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'setup_flow_screen.dart';
 
 class WalkthroughScreen extends StatefulWidget {
   const WalkthroughScreen({super.key});
@@ -11,6 +13,11 @@ class WalkthroughScreen extends StatefulWidget {
 class _WalkthroughScreenState extends State<WalkthroughScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
+
+  Future<void> _markWalkthroughAsSeen() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('walkthrough_seen', true);
+  }
 
   final List<Map<String, String>> _onboardingData = [
     {
@@ -123,8 +130,21 @@ class _WalkthroughScreenState extends State<WalkthroughScreen> {
                         child: ElevatedButton(
                           onPressed: () {
                             if (_currentPage == _onboardingData.length - 1) {
-                              // Navigate to Login/Home
-                              print("Navigate to Login");
+                              // Mark walkthrough as seen
+                              _markWalkthroughAsSeen();
+                              // Navigate to Setup Flow (account creation)
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => SetupFlowScreen(
+                                    onSetupComplete: () {
+                                      // After setup is complete, navigate to home
+                                      // This will be handled by the splash screen logic
+                                      Navigator.of(context).pop();
+                                    },
+                                  ),
+                                ),
+                              );
                             } else {
                               _pageController.nextPage(
                                 duration: const Duration(milliseconds: 300),

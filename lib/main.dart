@@ -1,24 +1,72 @@
 import 'package:flutter/material.dart';
-import 'screens/splash_screen.dart'; 
+import 'services/database_helper.dart';
+import 'screens/splash_screen.dart';
+import 'screens/home_screen.dart';
+import 'theme.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize database
+  final dbHelper = DatabaseHelper();
+  await dbHelper.database;
+  
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late Future<bool> _setupCheckFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupCheckFuture = _checkIfSetupComplete();
+  }
+
+  Future<bool> _checkIfSetupComplete() async {
+    final dbHelper = DatabaseHelper();
+    return await dbHelper.userProfileExists();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'MyPouch',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        // Updated seed color to match your gradient's primary green
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF015940)),
-        useMaterial3: true,
+      theme: AppTheme.buildTheme(),
+      routes: {
+        '/home': (context) => const HomeScreen(),
+      },
+      home: FutureBuilder<bool>(
+        future: _setupCheckFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+
+          if (snapshot.hasError) {
+            return Scaffold(
+              body: Center(
+                child: Text('Error: ${snapshot.error}'),
+              ),
+            );
+          }
+
+          // Always show splash screen first - it will handle navigation logic
+          return const SplashScreen();
+        },
       ),
-      home: const SplashScreen(),
     );
   }
 }

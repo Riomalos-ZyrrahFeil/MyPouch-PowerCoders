@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../services/database_helper.dart';
 import 'walkthrough_screen.dart';
+import 'pin_login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -12,6 +14,7 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
+  final DatabaseHelper _dbHelper = DatabaseHelper();
 
   @override
   void initState() {
@@ -26,11 +29,51 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     _controller.forward();
 
     Timer(const Duration(seconds: 4), () {
+      _navigateToNextScreen();
+    });
+  }
+
+  Future<void> _navigateToNextScreen() async {
+    try {
+      // Check if user profile exists
+      final userExists = await _dbHelper.checkUserExists();
+
+      if (!mounted) return;
+
+      Widget nextScreen;
+      
+      if (userExists) {
+        // User exists, go to login
+        nextScreen = const PINLoginScreen();
+      } else {
+        // No user exists, show walkthrough
+        // (walkthrough_seen flag is irrelevant if no user account exists)
+        nextScreen = const WalkthroughScreen();
+      }
+
+      // Use FadeTransition for seamless navigation
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const WalkthroughScreen()),
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => nextScreen,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: animation,
+              child: child,
+            );
+          },
+          transitionDuration: const Duration(milliseconds: 500),
+        ),
       );
-    });
+    } catch (e) {
+      // Default to walkthrough on error
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const WalkthroughScreen()),
+        );
+      }
+    }
   }
 
   @override
