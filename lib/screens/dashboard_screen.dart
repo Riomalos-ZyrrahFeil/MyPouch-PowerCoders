@@ -6,6 +6,7 @@ import 'add_goal_screen.dart';
 import 'transaction_history_screen.dart';
 import 'dart:io';
 import 'all_goals_screen.dart';
+import 'add_saving_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -53,25 +54,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _loadDashboardData();
   }
 
-  void _showAddMoneyDialog() {
-    if (_goals.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Create a goal first!")));
-      return;
-    }
-    
-    Navigator.push(
+  void _showAddMoneyDialog() async {
+    // Navigate to the new Add Savings Screen
+    final result = await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => GoalDetailsScreen(
-          goalId: _goals.first['id'],
-          title: _goals.first['title'],
-          savedAmount: _goals.first['current_amount'].toString(),
-          targetAmount: _goals.first['target_amount'].toString(),
-          progress: (_goals.first['current_amount'] / _goals.first['target_amount']).clamp(0.0, 1.0),
-          imagePath: _goals.first['image_path'] ?? 'assets/walkthrough.jpg',
-        ),
-      ),
-    ).then((_) => _loadDashboardData()); 
+      MaterialPageRoute(builder: (context) => const AddSavingScreen()),
+    );
+
+    // If result is true (user saved), refresh the dashboard
+    if (result == true) {
+      _loadDashboardData();
+    }
   }
 
   @override
@@ -225,7 +218,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             decoration: const BoxDecoration(
               color: Color(0xFF01140E),
-              border: Border(top: BorderSide(color: Colors.white10, width: 1)),
             ),
             child: SizedBox(
               height: 56,
