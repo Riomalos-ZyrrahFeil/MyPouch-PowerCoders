@@ -44,45 +44,6 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
     });
   }
 
-  Future<void> _addFunds() async {
-    final controller = TextEditingController();
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF01140E),
-        title: Text("Add Funds", style: GoogleFonts.poppins(color: Colors.white)),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: "Enter amount",
-            hintStyle: TextStyle(color: Colors.white30),
-            enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white30)),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF238E5F)),
-            onPressed: () async {
-              if (controller.text.isNotEmpty) {
-                final amount = double.tryParse(controller.text) ?? 0.0;
-                await _dbHelper.addContribution(goalId: widget.goalId, amount: amount, note: "Deposit");
-                Navigator.pop(context);
-                _loadHistory();
-              }
-            },
-            child: const Text("Add", style: TextStyle(color: Colors.white)),
-          )
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -152,13 +113,7 @@ class _GoalDetailsScreenState extends State<GoalDetailsScreen> {
             }, childCount: _transactions.length),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _addFunds,
-        backgroundColor: const Color(0xFF238E5F),
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: Text("Add Funds", style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
-      ),
+      )
     );
   }
 }
