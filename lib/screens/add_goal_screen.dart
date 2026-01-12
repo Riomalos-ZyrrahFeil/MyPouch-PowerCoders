@@ -7,7 +7,9 @@ import 'package:path/path.dart' as path;
 import '../services/database_helper.dart';
 
 class AddGoalScreen extends StatefulWidget {
-  const AddGoalScreen({super.key});
+  final Map<String, dynamic>? goal;
+
+  const AddGoalScreen({super.key, this.goal});
 
   @override
   State<AddGoalScreen> createState() => _AddGoalScreenState();
@@ -19,9 +21,20 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
   final _dbHelper = DatabaseHelper();
   
   File? _selectedImage;
+  String? _currentImagePath;
   bool _isLoading = false;
 
-  // Function to Pick Image from Gallery
+  @override
+  void initState() {
+    super.initState();
+    // Pre-fill data if editing
+    if (widget.goal != null) {
+      _titleController.text = widget.goal!['title'];
+      _targetAmountController.text = widget.goal!['target_amount'].toString();
+      _currentImagePath = widget.goal!['image_path'];
+    }
+  }
+
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
@@ -33,7 +46,6 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
     }
   }
 
-  // Function to Save Goal (and Image)
   Future<void> _saveGoal() async {
     if (_titleController.text.isEmpty || _targetAmountController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -45,9 +57,8 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
     setState(() => _isLoading = true);
 
     try {
-      String imagePath = 'assets/walkthrough.jpg';
-
-      // If user picked an image, save it permanently to App Documents
+      String imagePath = _currentImagePath ?? 'assets/walkthrough.jpg';
+      // If user picked a NEW image, save it
       if (_selectedImage != null) {
         final appDir = await getApplicationDocumentsDirectory();
         final fileName = path.basename(_selectedImage!.path);
@@ -55,12 +66,23 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
         imagePath = savedImage.path;
       }
 
-      await _dbHelper.addGoal(
-        title: _titleController.text,
-        description: '', 
-        targetAmount: double.parse(_targetAmountController.text),
-        imagePath: imagePath,
-      );
+      if (widget.goal != null) {
+        // UPDATE Existing Goal
+        await _dbHelper.updateGoal(
+          id: widget.goal!['id'],
+          title: _titleController.text,
+          targetAmount: double.parse(_targetAmountController.text),
+          imagePath: imagePath,
+        );
+      } else {
+        // CREATE New Goal
+        await _dbHelper.addGoal(
+          title: _titleController.text,
+          description: '', 
+          targetAmount: double.parse(_targetAmountController.text),
+          imagePath: imagePath,
+        );
+      }
 
       if (!mounted) return;
       Navigator.pop(context, true); // Return success
@@ -75,6 +97,18 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Determine Image Provider for display
+    ImageProvider? bgImage;
+    if (_selectedImage != null) {
+      bgImage = FileImage(_selectedImage!);
+    } else if (_currentImagePath != null) {
+      if (_currentImagePath!.startsWith('assets/')) {
+        bgImage = AssetImage(_currentImagePath!);
+      } else {
+        bgImage = FileImage(File(_currentImagePath!));
+      }
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF01140E),
       appBar: AppBar(
@@ -84,7 +118,10 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
           icon: const Icon(Icons.close, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text("Add New Goal", style: GoogleFonts.poppins(color: Colors.white)),
+        title: Text(
+          widget.goal != null ? "Edit Goal" : "Add New Goal", 
+          style: GoogleFonts.poppins(color: Colors.white)
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -92,9 +129,8 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // IMAGE PICKER SECTION
               GestureDetector(
-                onTap: _pickImage, // Tap to pick image
+                onTap: _pickImage,
                 child: Container(
                   width: double.infinity,
                   height: 150,
@@ -102,15 +138,11 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                     color: Colors.white10,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: Colors.white24, style: BorderStyle.solid),
-                    // If image is selected, show it as background
-                    image: _selectedImage != null
-                        ? DecorationImage(
-                            image: FileImage(_selectedImage!),
-                            fit: BoxFit.cover,
-                          )
+                    image: bgImage != null
+                        ? DecorationImage(image: bgImage, fit: BoxFit.cover)
                         : null,
                   ),
-                  child: _selectedImage == null
+                  child: bgImage == null
                       ? Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -119,7 +151,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                             Text("Add Reference Image", style: GoogleFonts.poppins(color: Colors.white54)),
                           ],
                         )
-                      : null, // Hide icon/text if image is selected
+                      : null,
                 ),
               ),
               const SizedBox(height: 30),
@@ -147,7 +179,10 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                   ),
                   child: _isLoading 
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : Text("Create Goal", style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                    : Text(
+                        widget.goal != null ? "Update Goal" : "Create Goal",
+                        style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)
+                      ),
                 ),
               ),
             ],
@@ -171,4 +206,4 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
       ),
     );
   }
-}
+}             
