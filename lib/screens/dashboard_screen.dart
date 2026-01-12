@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../services/database_helper.dart'; // Import DB
+import '../services/database_helper.dart'; 
 import 'goal_details_screen.dart';
 import 'add_goal_screen.dart';
 import 'transaction_history_screen.dart';
@@ -31,14 +31,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _loadDashboardData() async {
     setState(() => _isLoading = true);
     
-    // 1. Get User Name
     final userProfile = await _dbHelper.getUserProfile();
     final name = userProfile?['nickname'] ?? "User";
-
-    // 2. Get Goals
     final goals = await _dbHelper.getAllGoals();
-
-    // 3. Get Total Balance
     final total = await _dbHelper.getTotalBalance();
 
     if (mounted) {
@@ -51,15 +46,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  // Handle adding money to a goal directly from Dashboard
+  // Handle Delete Goal
+  Future<void> _deleteGoal(int id) async {
+    await _dbHelper.deleteGoal(id);
+    _loadDashboardData();
+  }
+
   void _showAddMoneyDialog() {
     if (_goals.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Create a goal first!")));
       return;
     }
     
-    // Simple logic: Add to the first goal for now, or you can make a picker
-    // For this example, we push to the first goal's details to add money
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -72,7 +70,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           imagePath: _goals.first['image_path'] ?? 'assets/walkthrough.jpg',
         ),
       ),
-    ).then((_) => _loadDashboardData()); // Refresh on return
+    ).then((_) => _loadDashboardData()); 
   }
 
   @override
@@ -133,8 +131,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text("Total Savings", style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14)),
-                              // History Button
+                              Text("Total Saved", style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14)),
                               InkWell(
                                 onTap: () {
                                    Navigator.push(context, MaterialPageRoute(
@@ -174,7 +171,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text("Your Goals", style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+                        Text("My Goals", style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
                         TextButton(
                           onPressed: () {}, 
                           child: Text("View All", style: GoogleFonts.poppins(color: const Color(0xFF238E5F))),
@@ -195,7 +192,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       )
                     else
                       ListView.builder(
-                        physics: const NeverScrollableScrollPhysics(), // Disable internal scroll
+                        physics: const NeverScrollableScrollPhysics(), 
                         shrinkWrap: true,
                         itemCount: _goals.length,
                         itemBuilder: (context, index) {
@@ -204,12 +201,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           
                           return _buildGoalCard(
                             context,
-                            goal['id'],
-                            goal['title'],
-                            "₱${goal['current_amount']}",
-                            "₱${goal['target_amount']}",
+                            goal,
                             progress,
-                            goal['image_path'] ?? 'assets/walkthrough.jpg',
                           );
                         },
                       ),
@@ -231,10 +224,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               height: 56,
               child: ElevatedButton.icon(
                 onPressed: () async {
-                  // Wait for result from AddGoalScreen
                   final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => const AddGoalScreen()));
                   if (result == true) {
-                    _loadDashboardData(); // Refresh if goal was added
+                    _loadDashboardData(); 
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -272,18 +264,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildGoalCard(BuildContext context, int id, String title, String saved, String target, double progress, String imagePath) {
+  Widget _buildGoalCard(BuildContext context, Map<String, dynamic> goal, double progress) {
+    String imagePath = goal['image_path'] ?? 'assets/walkthrough.jpg';
+    
     return GestureDetector(
       onTap: () async {
         await Navigator.push(context, MaterialPageRoute(builder: (context) => GoalDetailsScreen(
-          goalId: id, // Pass ID to fetch details
-          title: title,
-          savedAmount: saved,
-          targetAmount: target,
+          goalId: goal['id'],
+          title: goal['title'],
+          savedAmount: "₱${goal['current_amount']}",
+          targetAmount: "₱${goal['target_amount']}",
           progress: progress,
           imagePath: imagePath,
         )));
-        _loadDashboardData(); // Refresh on return (in case funds added)
+        _loadDashboardData(); 
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
@@ -312,7 +306,75 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                  // TITLE ROW with POPUP MENU
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          goal['title'], 
+                          style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      // EDIT / DELETE MENU
+                      SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: PopupMenuButton<String>(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.more_vert, color: Colors.white70, size: 20),
+                          color: const Color(0xFF01140E),
+                          onSelected: (value) async {
+                            if (value == 'edit') {
+                              // NAVIGATE TO EDIT
+                              final result = await Navigator.push(
+                                context, 
+                                MaterialPageRoute(
+                                  builder: (context) => AddGoalScreen(goal: goal)
+                                )
+                              );
+                              if (result == true) _loadDashboardData();
+                            } else if (value == 'delete') {
+                              // SHOW CONFIRMATION
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  backgroundColor: const Color(0xFF01140E),
+                                  title: Text("Delete Goal?", style: GoogleFonts.poppins(color: Colors.white)),
+                                  content: Text("Are you sure you want to delete '${goal['title']}'?", style: GoogleFonts.poppins(color: Colors.white70)),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(ctx), 
+                                      child: const Text("Cancel", style: TextStyle(color: Colors.grey))
+                                    ),
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.pop(ctx);
+                                        _deleteGoal(goal['id']);
+                                      }, 
+                                      child: const Text("Delete", style: TextStyle(color: Colors.redAccent))
+                                    ),
+                                  ],
+                                )
+                              );
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Text('Edit', style: TextStyle(color: Colors.white)),
+                            ),
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Text('Delete', style: TextStyle(color: Colors.redAccent)),
+                            ),
+                          ],
+                        ),
+                      )
+                    ],
+                  ),
+                  
                   const SizedBox(height: 8),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
@@ -326,7 +388,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(saved, style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12)),
+                      Text("₱${goal['current_amount']}", style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12)),
                       Text("${(progress * 100).toInt()}%", style: GoogleFonts.poppins(color: const Color(0xFF238E5F), fontSize: 12, fontWeight: FontWeight.bold)),
                     ],
                   ),
