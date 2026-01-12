@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/database_helper.dart';
 import '../widgets/custom_pin_keypad.dart';
 import 'account_recovery_flow.dart';
-import 'home_screen.dart';
+import 'dashboard_screen.dart';
 
 class PINLoginScreen extends StatefulWidget {
   const PINLoginScreen({super.key});
@@ -61,13 +61,11 @@ class _PINLoginScreenState extends State<PINLoginScreen> {
 
     try {
       debugPrint('=== PIN LOGIN ATTEMPT ===');
-      debugPrint('Entered PIN: $_pinEntry (length: ${_pinEntry.length})');
-      debugPrint('Attempt: $_attemptCount / $_maxAttempts');
       
       final isValid = await _dbHelper.verifyPin(_pinEntry);
 
       if (isValid) {
-        // Success - navigate to home
+        // Success - navigate to DASHBOARD
         debugPrint('✓ PIN verification successful');
         
         if (!mounted) return;
@@ -76,17 +74,13 @@ class _PINLoginScreenState extends State<PINLoginScreen> {
           _isLoading = false;
         });
         
-        // Navigate to home screen directly
+        // Navigate directly to DashboardScreen
         if (mounted) {
-          debugPrint('About to navigate to HomeScreen...');
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
-              builder: (context) => const HomeScreen(),
+              builder: (context) => const DashboardScreen(),
             ),
           );
-          debugPrint('Navigation complete');
-        } else {
-          debugPrint('Widget not mounted, cannot navigate');
         }
       } else {
         // Wrong PIN
@@ -256,7 +250,7 @@ class _PINLoginScreenState extends State<PINLoginScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.2),
+                      color: Colors.red.withOpacity(0.2), // Updated for Flutter 3+
                       border: Border.all(color: Colors.red),
                       borderRadius: BorderRadius.circular(8),
                     ),
