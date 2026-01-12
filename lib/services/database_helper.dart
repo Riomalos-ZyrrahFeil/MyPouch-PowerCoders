@@ -416,4 +416,35 @@ class DatabaseHelper {
       ORDER BY c.created_at DESC
     ''');
   }
+
+/// Update an existing goal
+  Future<int> updateGoal({
+    required int id,
+    required String title,
+    required double targetAmount,
+    required String imagePath,
+  }) async {
+    final db = await database;
+    return await db.update(
+      'goals',
+      {
+        'title': title,
+        'target_amount': targetAmount,
+        'image_path': imagePath,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// Delete a goal
+  Future<int> deleteGoal(int id) async {
+    final db = await database;
+    return await db.delete(
+      'goals',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
 }
