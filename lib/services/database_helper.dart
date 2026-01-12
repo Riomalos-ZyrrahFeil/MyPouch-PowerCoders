@@ -390,4 +390,30 @@ class DatabaseHelper {
       rethrow;
     }
   }
+
+  /// Get total saved amount across all active goals
+  Future<double> getTotalBalance() async {
+    final db = await database;
+    // Sum the 'current_amount' of all active goals
+    final result = await db.rawQuery(
+      "SELECT SUM(current_amount) as total FROM goals WHERE status = 'active'"
+    );
+    return (result.first['total'] as num?)?.toDouble() ?? 0.0;
+  }
+
+  /// Get ALL contributions sorted by date (Global History)
+  Future<List<Map<String, dynamic>>> getAllTransactions() async {
+    final db = await database;
+    // Join contributions with goals to show which goal the money went to
+    return await db.rawQuery('''
+      SELECT 
+        c.id, 
+        c.amount, 
+        c.created_at, 
+        g.title as goal_title 
+      FROM contributions c
+      INNER JOIN goals g ON c.goal_id = g.id
+      ORDER BY c.created_at DESC
+    ''');
+  }
 }
