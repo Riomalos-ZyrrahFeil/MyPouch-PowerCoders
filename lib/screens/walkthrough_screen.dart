@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'setup_flow_screen.dart';
+import 'home_screen.dart';
 
 class WalkthroughScreen extends StatefulWidget {
   const WalkthroughScreen({super.key});
@@ -129,21 +130,14 @@ class _WalkthroughScreenState extends State<WalkthroughScreen> {
                         height: 56,
                         child: ElevatedButton(
                           onPressed: () {
+                           // Inside the onPressed of the "Get Started" button
                             if (_currentPage == _onboardingData.length - 1) {
                               // Mark walkthrough as seen
                               _markWalkthroughAsSeen();
                               // Navigate to Setup Flow (account creation)
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(
-                                  builder: (context) => SetupFlowScreen(
-                                    onSetupComplete: () {
-                                      // After setup is complete, navigate to home
-                                      // This will be handled by the splash screen logic
-                                      Navigator.of(context).pop();
-                                    },
-                                  ),
-                                ),
+                                MaterialPageRoute(builder: (context) => const HomeScreen()), // GO TO HOME SCREEN
                               );
                             } else {
                               _pageController.nextPage(
