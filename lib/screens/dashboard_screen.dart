@@ -5,6 +5,7 @@ import 'goal_details_screen.dart';
 import 'add_goal_screen.dart';
 import 'transaction_history_screen.dart';
 import 'dart:io';
+import 'all_goals_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -171,9 +172,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text("My Goals", style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+                        Text("Your Goals", style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
                         TextButton(
-                          onPressed: () {}, 
+                          onPressed: () {
+                            // Navigate to All Goals Screen
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const AllGoalsScreen()),
+                            ).then((_) => _loadDashboardData());
+                          }, 
                           child: Text("View All", style: GoogleFonts.poppins(color: const Color(0xFF238E5F))),
                         ),
                       ],
