@@ -82,7 +82,7 @@ class _WalkthroughScreenState extends State<WalkthroughScreen> {
                 ),
               ),
 
-              // 2. Text and Button Section
+              // Text and Button Section
               Expanded(
                 flex: 3, 
                 child: Padding(
@@ -130,14 +130,22 @@ class _WalkthroughScreenState extends State<WalkthroughScreen> {
                         height: 56,
                         child: ElevatedButton(
                           onPressed: () {
-                           // Inside the onPressed of the "Get Started" button
                             if (_currentPage == _onboardingData.length - 1) {
-                              // Mark walkthrough as seen
                               _markWalkthroughAsSeen();
-                              // Navigate to Setup Flow (account creation)
+                              
                               Navigator.pushReplacement(
                                 context,
-                                MaterialPageRoute(builder: (context) => const HomeScreen()), // GO TO HOME SCREEN
+                                MaterialPageRoute(
+                                  builder: (context) => SetupFlowScreen(
+                                    onSetupComplete: () {
+                                      // After setup is done -> Go to Home Screen (Success Page)
+                                      Navigator.pushReplacement(
+                                        context,
+                                        MaterialPageRoute(builder: (context) => const HomeScreen()),
+                                      );
+                                    },
+                                  ),
+                                ),
                               );
                             } else {
                               _pageController.nextPage(
