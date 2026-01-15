@@ -3,14 +3,14 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/database_helper.dart';
 
 class TransactionHistoryScreen extends StatefulWidget {
-  final bool isGlobal; // If true, fetches all. If false, (optional) specific.
+  final bool isGlobal;
   final String title;
   final String amount;
 
   const TransactionHistoryScreen({
-    super.key, 
+    super.key,
     this.isGlobal = false,
-    this.title = "History", 
+    this.title = "History",
     this.amount = ""
   });
 
@@ -37,7 +37,6 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
         _isLoading = false;
       });
     } else {
-      // If used for single item details (legacy usage), just stop loading
       setState(() => _isLoading = false);
     }
   }
@@ -52,28 +51,64 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
         leading: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.white), onPressed: () => Navigator.pop(context)),
         title: Text(widget.title, style: GoogleFonts.poppins(color: Colors.white)),
       ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator()) 
+      body: _isLoading
+        ? const Center(child: CircularProgressIndicator())
         : _transactions.isEmpty && widget.isGlobal
           ? Center(child: Text("No transaction history yet.", style: GoogleFonts.poppins(color: Colors.white54)))
           : ListView.builder(
               padding: const EdgeInsets.all(20),
-              // Use fetched list if global, otherwise 1 static item (legacy)
               itemCount: widget.isGlobal ? _transactions.length : 1,
               itemBuilder: (context, index) {
-                // If Global, use data from DB
-                String label = widget.isGlobal ? "Deposit to ${_transactions[index]['goal_title']}" : widget.title;
+                final double amount = (widget.isGlobal ? _transactions[index]['amount'] : 0.0) as double;
+                final bool isWithdrawal = amount < 0;
+                final String goalTitle = widget.isGlobal ? _transactions[index]['goal_title'] : "";
+                final String note = widget.isGlobal ? (_transactions[index]['note'] ?? "") : "";
+
+                String label;
+                if (isWithdrawal) {
+                  label = "Withdrawal from $goalTitle";
+                } else {
+                  label = "Deposit to $goalTitle";
+                }
+
+                if (note.isNotEmpty && note.length < 30) label = note;
+
+
                 String date = widget.isGlobal ? _transactions[index]['created_at'].toString().split(' ')[0] : "Today";
-                String val = widget.isGlobal ? "+₱${_transactions[index]['amount']}" : widget.amount;
+                String val = widget.isGlobal
+                    ? "${isWithdrawal ? '' : '+'}₱${amount.toStringAsFixed(0)}"
+                    : widget.amount;
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
                   child: Row(
                     children: [
-                      Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.arrow_downward, color: Color(0xFF238E5F))),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(12)),
+                        child: Icon(
+                          isWithdrawal ? Icons.arrow_upward : Icons.arrow_downward,
+                          color: isWithdrawal ? Colors.redAccent : const Color(0xFF238E5F)
+                        )
+                      ),
                       const SizedBox(width: 16),
-                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.white)), Text(date, style: GoogleFonts.poppins(color: Colors.white54))])),
-                      Text(val, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16, color: const Color(0xFF238E5F))),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(label, style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: Colors.white)),
+                            Text(date, style: GoogleFonts.poppins(color: Colors.white54))
+                          ]
+                        )
+                      ),
+                      Text(
+                        val,
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: isWithdrawal ? Colors.redAccent : const Color(0xFF238E5F)
+                        )
+                      ),
                     ],
                   ),
                 );
