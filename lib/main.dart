@@ -3,6 +3,7 @@ import 'services/database_helper.dart';
 import 'screens/splash_screen.dart';
 import 'screens/home_screen.dart';
 import 'theme.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -10,6 +11,7 @@ void main() async {
   // Initialize database
   final dbHelper = DatabaseHelper();
   await dbHelper.database;
+  await NotificationService().init();
   
   runApp(const MyApp());
 }
