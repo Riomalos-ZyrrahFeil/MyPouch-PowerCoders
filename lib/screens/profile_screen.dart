@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:image_picker/image_picker.dart';
 import '../services/database_helper.dart';
 import 'edit_profile_screen.dart';
 import 'security_settings_screen.dart';
@@ -32,18 +31,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (mounted && user != null) {
       setState(() {
         _nickname = user['nickname'] ?? "User";
+        _profileImagePath = user['image_path']; 
       });
-    }
-  }
-
-  // Pick Image Logic
-  Future<void> _pickImage() async {
-    final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-    
-    if (image != null) {
-      setState(() => _profileImagePath = image.path);
-      // TODO: Save this path to your database 'users' table if you want it persistent
     }
   }
 
@@ -58,36 +47,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: [
               const SizedBox(height: 20),
               
-              // 1. PROFILE IMAGE (Changeable)
-              GestureDetector(
-                onTap: _pickImage,
-                child: Stack(
-                  children: [
-                    Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        color: Colors.white10,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: const Color(0xFF238E5F), width: 2),
-                        image: _profileImagePath != null
-                            ? DecorationImage(image: FileImage(File(_profileImagePath!)), fit: BoxFit.cover)
-                            : const DecorationImage(image: AssetImage('assets/logo.png'), fit: BoxFit.cover), // Default
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF238E5F),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
-                      ),
-                    ),
-                  ],
+              // PROFILE IMAGE
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  color: Colors.white10,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFF238E5F), width: 2),
+                  // Logic: Show FileImage if path exists, else show asset logo
+                  image: _profileImagePath != null && File(_profileImagePath!).existsSync()
+                      ? DecorationImage(image: FileImage(File(_profileImagePath!)), fit: BoxFit.cover)
+                      : const DecorationImage(image: AssetImage('assets/logo.png'), fit: BoxFit.cover),
                 ),
               ),
               const SizedBox(height: 16),
@@ -100,14 +71,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               
               const SizedBox(height: 8),
 
-              // 2. EDIT PROFILE BUTTON
+              // EDIT PROFILE BUTTON
               SizedBox(
                 width: 140,
                 height: 40,
                 child: ElevatedButton(
                   onPressed: () async {
+                    // Wait for Edit Screen to close, then reload data
                     await Navigator.push(context, MaterialPageRoute(builder: (context) => const EditProfileScreen()));
-                    _loadProfile(); // Refresh on return
+                    _loadProfile(); 
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white10,
@@ -120,7 +92,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: 40),
 
-              // 3. SETTINGS GROUPS
+              // SETTINGS GROUPS
               _buildSectionTitle("General"),
               _buildSettingsTile(
                 icon: Icons.notifications_outlined, 
@@ -130,18 +102,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _buildSettingsTile(
                 icon: Icons.security, 
                 title: "Security", 
-                subtitle: "PIN & Recovery",
+                subtitle: "PIN, Recovery & Reset",
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SecuritySettingsScreen())),
               ),
 
               const SizedBox(height: 30),
               
-              // 4. DATA & ABOUT (After Spacer)
+              // DATA & ABOUT
               _buildSectionTitle("Data & Support"),
               _buildSettingsTile(
                 icon: Icons.cloud_upload_outlined, 
                 title: "Backup Data", 
-                subtitle: "Export & Restore",
+                subtitle: "Export CSV & Restore",
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const BackupScreen())),
               ),
               _buildSettingsTile(
@@ -152,7 +124,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               
               const SizedBox(height: 40),
               
-              // Version Info
               Text("MyPouch v1.0.0", style: GoogleFonts.poppins(color: Colors.white24, fontSize: 12)),
             ],
           ),
