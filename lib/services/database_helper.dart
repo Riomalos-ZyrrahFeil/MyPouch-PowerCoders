@@ -358,11 +358,9 @@ class DatabaseHelper {
     _database = await _initDatabase();
   }
 
-  /// Get daily contributions for the last 7 days (Monday to Sunday)
   Future<Map<int, double>> getWeeklyActivity() async {
     final db = await database;
     final now = DateTime.now();
-    // Calculate start of the week (Monday)
     final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
     final endOfWeek = startOfWeek.add(const Duration(days: 6));
 
@@ -373,19 +371,16 @@ class DatabaseHelper {
       GROUP BY day_index
     ''', [startOfWeek.toIso8601String(), endOfWeek.add(const Duration(days: 1)).toIso8601String()]);
 
-    // Map: 1=Mon, 7=Sun (SQLite %w: 0=Sun, 1=Mon...6=Sat)
     Map<int, double> activity = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0};
 
     for (var row in result) {
       int dbDay = int.parse(row['day_index'].toString());
-      // Convert SQLite 0(Sun) to Dart 7(Sun)
       int weekDay = dbDay == 0 ? 7 : dbDay;
       activity[weekDay] = (row['total'] as num).toDouble();
     }
     return activity;
   }
 
-  /// Get total saved per goal for the Pie Chart
   Future<Map<String, double>> getGoalDistribution() async {
     final db = await database;
     final result = await db.rawQuery('''
@@ -402,7 +397,6 @@ class DatabaseHelper {
     return distribution;
   }
 
-  /// Calculate Current Streak (Consecutive days with savings)
   Future<int> getStreak() async {
     final db = await database;
     final result = await db.rawQuery('''
@@ -415,12 +409,9 @@ class DatabaseHelper {
 
     int streak = 0;
     DateTime checkDate = DateTime.now();
-   
-    // Check if today has a contribution
     String todayStr = checkDate.toIso8601String().split('T')[0];
     bool todaySaved = result.any((row) => row['day'] == todayStr);
-   
-    // If not saved today, check if saved yesterday to keep streak alive
+
     if (!todaySaved) {
       checkDate = checkDate.subtract(const Duration(days: 1));
     }
@@ -433,16 +424,14 @@ class DatabaseHelper {
         streak++;
         checkDate = checkDate.subtract(const Duration(days: 1));
       } else if (DateTime.parse(dbDate).isAfter(checkDate)) {
-        // Skip future dates if any
         continue;
       } else {
-        break; // Streak broken
+        break;
       }
     }
     return streak;
   }
 
-  /// Get Average Daily Savings (Total Savings / Days since first deposit)
   Future<double> getDailyAverage() async {
     final db = await database;
     final firstDeposit = await db.rawQuery('SELECT MIN(created_at) as first_day FROM contributions');
@@ -451,7 +440,7 @@ class DatabaseHelper {
     if (firstDeposit.first['first_day'] == null || total == 0) return 0.0;
 
     DateTime start = DateTime.parse(firstDeposit.first['first_day'].toString());
-    int daysDiff = DateTime.now().difference(start).inDays + 1; // +1 to avoid division by zero
+    int daysDiff = DateTime.now().difference(start).inDays + 1;
 
     return total / daysDiff;
   }

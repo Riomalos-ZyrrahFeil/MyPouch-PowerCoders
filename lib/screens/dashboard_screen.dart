@@ -7,7 +7,7 @@ import 'transaction_history_screen.dart';
 import 'dart:io';
 import 'all_goals_screen.dart';
 import 'add_saving_screen.dart';
-import 'statistics_screen.dart'; // Import the new Statistics Screen
+import 'statistics_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -64,7 +64,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  // Extracted the Dashboard UI into a method to allow switching
   Widget _buildDashboardUI() {
     return Column(
       children: [
@@ -212,7 +211,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Widget to build the Goal Card (Helper)
   Widget _buildGoalCard(BuildContext context, Map<String, dynamic> goal, double progress) {
     String imagePath = goal['image_path'] ?? 'assets/walkthrough.jpg';
  
@@ -356,7 +354,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Text(_userName, style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
               ],
             )
-          : null, // Hide title in Stats screen or customize it there
+          : null,
         actions: [
           Container(
             margin: const EdgeInsets.only(right: 16),

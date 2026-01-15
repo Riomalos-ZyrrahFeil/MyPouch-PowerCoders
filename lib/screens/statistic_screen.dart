@@ -23,7 +23,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   double _topGoalTarget = 0.0;
   double _topGoalCurrent = 0.0;
   bool _isLoading = true;
-  int _timeFilterIndex = 1; // 0: All, 1: Week, 2: Month, 3: Year
+  int _timeFilterIndex = 1;
 
   @override
   void initState() {
@@ -38,15 +38,13 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
     final distribution = await _dbHelper.getGoalDistribution();
     final streak = await _dbHelper.getStreak();
     final average = await _dbHelper.getDailyAverage();
-   
-    // Get the active goal with the highest target for the "Projection" card
+
     final goals = await _dbHelper.getAllGoals();
     String tName = "Goal";
     double tTarget = 0;
     double tCurrent = 0;
    
     if (goals.isNotEmpty) {
-      // Logic: Pick the first active goal, or sort by priority
       final mainGoal = goals.first;
       tName = mainGoal['title'];
       tTarget = (mainGoal['target_amount'] as num).toDouble();
@@ -173,7 +171,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
               _buildProjectionCard(),
               const SizedBox(height: 24),
 
-              // ACTIVITY CHART (Mockup style bars)
+              // ACTIVITY CHART
               Text("Activity", style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
               const SizedBox(height: 16),
               Container(
@@ -187,7 +185,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: List.generate(7, (index) {
-                    int day = index + 1; // 1=Mon
+                    int day = index + 1;
                     double amount = _weeklyActivity[day] ?? 0;
                     double max = _weeklyActivity.values.reduce((a, b) => a > b ? a : b);
                     if (max == 0) max = 1;
@@ -201,7 +199,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                         const SizedBox(height: 4),
                         Container(
                           width: 12,
-                          height: 100 * heightFactor + 10, // Min height
+                          height: 100 * heightFactor + 10,
                           decoration: BoxDecoration(
                             color: amount > 0 ? const Color(0xFF238E5F) : Colors.white10,
                             borderRadius: BorderRadius.circular(6),
@@ -257,7 +255,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
                   );
                 }).toList(),
               ),
-              const SizedBox(height: 100), // Bottom padding
+              const SizedBox(height: 100),
             ],
           ),
         ),
@@ -266,7 +264,6 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   }
 
   Widget _buildProjectionCard() {
-    // Calculate days remaining based on daily average
     int daysRemaining = 0;
     if (_dailyAverage > 0 && _topGoalTarget > _topGoalCurrent) {
       daysRemaining = ((_topGoalTarget - _topGoalCurrent) / _dailyAverage).ceil();
