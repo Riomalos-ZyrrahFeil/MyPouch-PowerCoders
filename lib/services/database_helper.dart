@@ -444,4 +444,21 @@ class DatabaseHelper {
 
     return total / daysDiff;
   }
+
+  Future<void> withdrawFunds(int goalId, double amount) async {
+    final db = await database;
+
+    await db.insert('contributions', {
+      'goal_id': goalId,
+      'amount': -amount,
+      'note': 'Goal Achieved! Withdrawn & Enjoyed.',
+      'source': 'Pouch',
+      'created_at': DateTime.now().toString(),
+    });
+
+    await db.rawUpdate(
+      'UPDATE goals SET current_amount = 0, updated_at = ? WHERE id = ?',
+      [DateTime.now().toString(), goalId],
+    );
+  }
 }
