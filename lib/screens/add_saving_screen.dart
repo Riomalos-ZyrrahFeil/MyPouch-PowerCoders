@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../services/database_helper.dart';
 import 'money_source_screen.dart';
+import 'celebration_screen.dart';
 
 class AddSavingScreen extends StatefulWidget {
   const AddSavingScreen({super.key});
@@ -16,9 +17,9 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
   final DatabaseHelper _dbHelper = DatabaseHelper();
-  
+ 
   List<Map<String, dynamic>> _displayGoals = [];
-  int? _selectedGoalId; // If -1, it means "General Savings"
+  int? _selectedGoalId;
   String _selectedSource = "Cash";
   bool _isLoading = false;
   DateTime _selectedDate = DateTime.now();
@@ -31,8 +32,7 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
 
   Future<void> _loadGoals() async {
     final goals = await _dbHelper.getAllGoals();
-    
-    // Create a special item for "General Savings"
+
     final generalSavings = {
       'id': -1,
       'title': 'General Savings',
@@ -43,7 +43,7 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
     if (mounted) {
       setState(() {
         _displayGoals = [generalSavings, ...goals];
-        _selectedGoalId = -1;
+        _selectedGoalId = -1; // Default to General Savings
       });
     }
   }
@@ -67,7 +67,7 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
       } else {
         finalGoalId = _selectedGoalId!;
       }
-      
+
       await _dbHelper.addContribution(
         goalId: finalGoalId,
         amount: amount,
@@ -75,12 +75,38 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
         source: _selectedSource,
       );
 
+      final updatedGoal = await _dbHelper.getGoalDetails(finalGoalId);
+     
       if (!mounted) return;
-      Navigator.pop(context, true); 
+
+      if (updatedGoal != null) {
+        double current = (updatedGoal['current_amount'] as num).toDouble();
+        double target = (updatedGoal['target_amount'] as num).toDouble();
+        String title = updatedGoal['title'];
+
+        if (target > 0 && current >= target) {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => CelebrationScreen(
+                goalId: finalGoalId,
+                goalTitle: title,
+                savedAmount: current,
+              ),
+            ),
+          );
+
+          if (mounted) Navigator.pop(context, true);
+        } else {
+          Navigator.pop(context, true);
+        }
+      } else {
+        Navigator.pop(context, true);
+      }
+
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      Navigator.pop(context, true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -88,7 +114,7 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
 
   Future<void> _selectSource() async {
     final result = await Navigator.push(
-      context, 
+      context,
       MaterialPageRoute(builder: (context) => const MoneySourceScreen())
     );
     if (result != null) {
@@ -140,7 +166,6 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // AMOUNT INPUT
             Center(
               child: Column(
                 children: [
@@ -162,12 +187,10 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
               ),
             ),
             const SizedBox(height: 30),
-
-            // SAVE TO (Horizontal List)
             Text("Save to", style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14)),
             const SizedBox(height: 12),
             SizedBox(
-              height: 120, 
+              height: 120,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: _displayGoals.length,
@@ -176,56 +199,27 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
                   final goal = _displayGoals[index];
                   final isSelected = goal['id'] == _selectedGoalId;
                   final imagePath = goal['image_path'] ?? 'assets/logo.png';
-                  
-                  // Determine image provider
                   ImageProvider bgImage;
                   if (imagePath.startsWith('assets/')) {
                     bgImage = AssetImage(imagePath);
                   } else {
                     bgImage = FileImage(File(imagePath));
                   }
-
                   return GestureDetector(
-                    onTap: () {
-                      setState(() => _selectedGoalId = goal['id']);
-                    },
+                    onTap: () => setState(() => _selectedGoalId = goal['id']),
                     child: Column(
                       children: [
                         Container(
-                          width: 80,
-                          height: 80,
+                          width: 80, height: 80,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(16),
-                            border: isSelected 
-                                ? Border.all(color: const Color(0xFF238E5F), width: 3) 
-                                : Border.all(color: Colors.white10),
-                            image: DecorationImage(
-                              image: bgImage,
-                              fit: BoxFit.cover,
-                              colorFilter: isSelected 
-                                  ? null 
-                                  : ColorFilter.mode(Colors.black.withOpacity(0.6), BlendMode.darken),
-                            ),
+                            border: isSelected ? Border.all(color: const Color(0xFF238E5F), width: 3) : Border.all(color: Colors.white10),
+                            image: DecorationImage(image: bgImage, fit: BoxFit.cover, colorFilter: isSelected ? null : ColorFilter.mode(Colors.black.withOpacity(0.6), BlendMode.darken)),
                           ),
-                          child: isSelected 
-                              ? const Center(child: Icon(Icons.check, color: Colors.white, size: 30))
-                              : null,
+                          child: isSelected ? const Center(child: Icon(Icons.check, color: Colors.white, size: 30)) : null,
                         ),
                         const SizedBox(height: 8),
-                        SizedBox(
-                          width: 80,
-                          child: Text(
-                            goal['title'],
-                            style: GoogleFonts.poppins(
-                              color: isSelected ? const Color(0xFF238E5F) : Colors.white70,
-                              fontSize: 12,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                            ),
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
+                        SizedBox(width: 80, child: Text(goal['title'], style: GoogleFonts.poppins(color: isSelected ? const Color(0xFF238E5F) : Colors.white70, fontSize: 12, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis)),
                       ],
                     ),
                   );
@@ -233,110 +227,51 @@ class _AddSavingScreenState extends State<AddSavingScreen> {
               ),
             ),
             const SizedBox(height: 24),
-
-            // FROM (Source Selection)
             Text("From", style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14)),
             const SizedBox(height: 10),
             GestureDetector(
               onTap: _selectSource,
               child: Container(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white10,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white24),
-                ),
+                decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white24)),
                 child: Row(
                   children: [
                     const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFF238E5F)),
                     const SizedBox(width: 16),
-                    Expanded(
-                      child: Text(
-                        _selectedSource,
-                        style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
-                      ),
-                    ),
+                    Expanded(child: Text(_selectedSource, style: GoogleFonts.poppins(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500))),
                     const Icon(Icons.arrow_forward_ios, color: Colors.white24, size: 16),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 24),
-
-            // DATE & NOTE
             Row(
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Date", style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14)),
-                      const SizedBox(height: 10),
-                      GestureDetector(
-                        onTap: _pickDate,
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white10,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.white24),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.calendar_today, color: Color(0xFF238E5F), size: 18),
-                              const SizedBox(width: 8),
-                              Text(
-                                DateFormat('MMM dd').format(_selectedDate),
-                                style: GoogleFonts.poppins(color: Colors.white),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
+                  child: GestureDetector(
+                    onTap: _pickDate,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("Date", style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14)),
+                        const SizedBox(height: 10),
+                        Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white24)), child: Row(children: [const Icon(Icons.calendar_today, color: Color(0xFF238E5F), size: 18), const SizedBox(width: 8), Text(DateFormat('MMM dd').format(_selectedDate), style: GoogleFonts.poppins(color: Colors.white))])),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),
-                Expanded(
-                  flex: 2,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Note", style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14)),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _noteController,
-                        style: GoogleFonts.poppins(color: Colors.white),
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: Colors.white10,
-                          hintText: "Optional",
-                          hintStyle: GoogleFonts.poppins(color: Colors.white30),
-                          contentPadding: const EdgeInsets.all(16),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                Expanded(flex: 2, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text("Note", style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14)), const SizedBox(height: 10), TextField(controller: _noteController, style: GoogleFonts.poppins(color: Colors.white), decoration: InputDecoration(filled: true, fillColor: Colors.white10, hintText: "Optional", hintStyle: GoogleFonts.poppins(color: Colors.white30), contentPadding: const EdgeInsets.all(16), border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)))])),
               ],
             ),
-
             const SizedBox(height: 40),
-
-            // CONFIRM BUTTON
             SizedBox(
               width: double.infinity,
               height: 56,
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _saveTransaction,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF238E5F),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-                child: _isLoading 
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : Text("Confirm Savings", style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF238E5F), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : Text("Confirm Savings", style: GoogleFonts.poppins(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
               ),
             ),
           ],
