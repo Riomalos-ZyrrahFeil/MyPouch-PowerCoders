@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'dart:convert';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -27,7 +28,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 2, // CHANGED TO 2 TO FORCE UPDATE/CREATION
+      version: 3, 
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
       onOpen: (db) {
@@ -47,6 +48,8 @@ class DatabaseHelper {
         pin TEXT NOT NULL,
         security_question TEXT NOT NULL,
         security_answer TEXT NOT NULL,
+        bio TEXT, 
+        image_path TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
@@ -69,14 +72,14 @@ class DatabaseHelper {
       )
     ''');
 
-    // Contributions table (Includes 'source')
+    // Contributions table
     await db.execute('''
       CREATE TABLE contributions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         goal_id INTEGER NOT NULL,
         amount REAL NOT NULL,
         note TEXT,
-        source TEXT, -- Added for Money Source feature
+        source TEXT, 
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (goal_id) REFERENCES goals(id) ON DELETE CASCADE
       )
@@ -88,64 +91,31 @@ class DatabaseHelper {
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     debugPrint("=== UPGRADING DATABASE from $oldVersion to $newVersion ===");
     
-    var tables = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
-    var tableNames = tables.map((t) => t['name']).toList();
-
-    if (!tableNames.contains('users')) {
-      await db.execute('''
-        CREATE TABLE users (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          nickname TEXT NOT NULL,
-          pin TEXT NOT NULL,
-          security_question TEXT NOT NULL,
-          security_answer TEXT NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      ''');
+    // Helper to check if column exists
+    Future<bool> columnExists(String tableName, String columnName) async {
+      var res = await db.rawQuery("PRAGMA table_info($tableName)");
+      return res.any((row) => row['name'] == columnName);
     }
 
-    if (!tableNames.contains('goals')) {
-      await db.execute('''
-        CREATE TABLE goals (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          user_id INTEGER NOT NULL,
-          title TEXT NOT NULL,
-          description TEXT,
-          target_amount REAL NOT NULL,
-          current_amount REAL DEFAULT 0,
-          image_path TEXT,
-          status TEXT DEFAULT 'active',
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        )
-      ''');
+    // Version 2: Money Source
+    if (oldVersion < 2) {
+      if (!await columnExists('contributions', 'source')) {
+        try { await db.execute('ALTER TABLE contributions ADD COLUMN source TEXT'); } catch (_) {}
+      }
     }
 
-    if (!tableNames.contains('contributions')) {
-      await db.execute('''
-        CREATE TABLE contributions (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          goal_id INTEGER NOT NULL,
-          amount REAL NOT NULL,
-          note TEXT,
-          source TEXT,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (goal_id) REFERENCES goals(id) ON DELETE CASCADE
-        )
-      ''');
-    } else {
-      // If table exists but might be missing 'source', try adding it
-      try {
-        await db.execute('ALTER TABLE contributions ADD COLUMN source TEXT');
-      } catch (e) {
-        debugPrint("Column 'source' likely already exists: $e");
+    // Version 3: Profile Bio & Image (For Edit Profile)
+    if (oldVersion < 3) {
+      if (!await columnExists('users', 'bio')) {
+        try { await db.execute('ALTER TABLE users ADD COLUMN bio TEXT'); } catch (_) {}
+      }
+      if (!await columnExists('users', 'image_path')) {
+        try { await db.execute('ALTER TABLE users ADD COLUMN image_path TEXT'); } catch (_) {}
       }
     }
   }
 
-  // --- METHODS ---
+  // --- CORE METHODS ---
 
   Future<int> saveUserProfile({ 
     required String nickname,
@@ -169,7 +139,6 @@ class DatabaseHelper {
       final count = Sqflite.firstIntValue(result) ?? 0;
       return count > 0;
     } catch (e) {
-      debugPrint("Error checking user: $e");
       return false;
     }
   }
@@ -177,10 +146,10 @@ class DatabaseHelper {
   Future<bool> userProfileExists() async => checkUserExists();
 
   Future<Map<String, dynamic>?> getUserProfile() async {
-    final db = await database;
-    final result = await db.query('users', limit: 1);
-    return result.isNotEmpty ? result.first : null;
-  }
+      final db = await database;
+      final result = await db.query('users', limit: 1);
+      return result.isNotEmpty ? result.first : null;
+    }
 
   Future<bool> verifyPin(String pin) async {
     final db = await database;
@@ -206,6 +175,8 @@ class DatabaseHelper {
     if (userId == null) throw Exception('User not found');
     return await db.update('users', {'pin': newPin, 'updated_at': DateTime.now().toIso8601String()}, where: 'id = ?', whereArgs: [userId]);
   }
+
+  // --- GOAL METHODS ---
 
   Future<int> addGoal({
     required String title,
@@ -234,10 +205,8 @@ class DatabaseHelper {
     return await db.query('goals', where: 'user_id = ? AND status = ?', whereArgs: [user['id'], 'active'], orderBy: 'created_at DESC');
   }
 
-  // "General Savings" Goal ID
   Future<int> getGeneralSavingsGoalId() async {
     final db = await database;
-    
     final result = await db.query('goals', where: "title = ?", whereArgs: ['General Savings'], limit: 1);
     
     if (result.isNotEmpty) {
@@ -258,7 +227,8 @@ class DatabaseHelper {
     }
   }
 
-  // Updated to include SOURCE parameter
+  // --- CONTRIBUTION METHODS ---
+
   Future<int> addContribution({
     required int goalId,
     required double amount,
@@ -299,7 +269,7 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> getAllTransactions() async {
     final db = await database;
     return await db.rawQuery('''
-      SELECT c.id, c.amount, c.created_at, c.source, g.title as goal_title 
+      SELECT c.id, c.amount, c.created_at, c.source, g.title as goal_title, c.note
       FROM contributions c
       INNER JOIN goals g ON c.goal_id = g.id
       ORDER BY c.created_at DESC
@@ -327,7 +297,6 @@ class DatabaseHelper {
   }
 
   Future<void> closeDatabase() async => (await database).close();
-  Future<void> deleteDatabaseFile() async { _database?.close(); _database = null; }
   
   Future<String?> getCurrentPin() async {
     try {
@@ -351,12 +320,8 @@ class DatabaseHelper {
     await db.delete('goals');
     await db.delete('users');
   }
-  
-  Future<void> reinitializeDatabase() async {
-    await _database?.close();
-    _database = null;
-    _database = await _initDatabase();
-  }
+
+  // --- STATS METHODS ---
 
   Future<Map<int, double>> getWeeklyActivity() async {
     final db = await database;
@@ -437,7 +402,7 @@ class DatabaseHelper {
     final firstDeposit = await db.rawQuery('SELECT MIN(created_at) as first_day FROM contributions');
     final total = await getTotalBalance();
 
-    if (firstDeposit.first['first_day'] == null || total == 0) return 0.0;
+    if (firstDeposit.isEmpty || firstDeposit.first['first_day'] == null || total == 0) return 0.0;
 
     DateTime start = DateTime.parse(firstDeposit.first['first_day'].toString());
     int daysDiff = DateTime.now().difference(start).inDays + 1;
@@ -460,5 +425,93 @@ class DatabaseHelper {
       'UPDATE goals SET current_amount = 0, updated_at = ? WHERE id = ?',
       [DateTime.now().toString(), goalId],
     );
+  }
+
+  // Update Profile
+  Future<int> updateUserProfile({String? nickname, String? bio, String? imagePath}) async {
+    final db = await database;
+    final userId = await getUserId();
+    if (userId == null) return 0;
+
+    Map<String, dynamic> updateData = {
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+    if (nickname != null) updateData['nickname'] = nickname;
+    if (bio != null) updateData['bio'] = bio;
+    if (imagePath != null) updateData['image_path'] = imagePath;
+    
+    return await db.update('users', updateData, where: 'id = ?', whereArgs: [userId]);
+  }
+
+  // Update Security Question
+  Future<void> updateSecurityQuestion(String question, String answer) async {
+    final db = await database;
+    final userId = await getUserId();
+    
+    if (userId != null) {
+      await db.update('users', {
+          'security_question': question,
+          'security_answer': answer,
+          'updated_at': DateTime.now().toIso8601String(),
+        }, where: 'id = ?', whereArgs: [userId]);
+    }
+  }
+
+  // Export CSV (For Excel viewing)
+  Future<String> exportDataToCsv() async {
+    final db = await database;
+    final goals = await db.query('goals');
+    final contribs = await db.query('contributions');
+
+    String csv = "TYPE,ID,TITLE_OR_GOALID,AMOUNT,DATE,NOTE_OR_STATUS\n";
+
+    for (var g in goals) {
+      csv += "GOAL,${g['id']},${g['title']},${g['target_amount']},${g['created_at']},${g['status']}\n";
+    }
+    for (var c in contribs) {
+      csv += "CONTRIB,${c['id']},${c['goal_id']},${c['amount']},${c['created_at']},${c['note']}\n";
+    }
+    return csv;
+  }
+
+  // Export JSON (For Backup File)
+  Future<String> exportDataToJson() async {
+    final db = await database;
+    Map<String, dynamic> data = {};
+    
+    data['users'] = await db.query('users');
+    data['goals'] = await db.query('goals');
+    data['contributions'] = await db.query('contributions');
+    
+    return jsonEncode(data);
+  }
+
+Future<void> importDataFromJson(String jsonString) async {
+    final db = await database;
+    final data = jsonDecode(jsonString);
+    
+    final currentUserId = await getUserId();
+    if (currentUserId == null) throw Exception("No active user found to restore data to.");
+
+    await db.transaction((txn) async {
+      await txn.delete('contributions');
+      await txn.delete('goals');
+      
+      if (data['goals'] != null) {
+        for (var item in data['goals']) {
+          final Map<String, dynamic> goal = Map<String, dynamic>.from(item);
+          
+          goal['user_id'] = currentUserId; 
+          
+          await txn.insert('goals', goal);
+        }
+      }
+
+      if (data['contributions'] != null) {
+        for (var item in data['contributions']) {
+          await txn.insert('contributions', item);
+        }
+      }
+    });
   }
 }
