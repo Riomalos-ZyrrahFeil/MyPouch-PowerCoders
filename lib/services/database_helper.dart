@@ -357,4 +357,91 @@ class DatabaseHelper {
     _database = null;
     _database = await _initDatabase();
   }
+
+  Future<Map<int, double>> getWeeklyActivity() async {
+    final db = await database;
+    final now = DateTime.now();
+    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    final endOfWeek = startOfWeek.add(const Duration(days: 6));
+
+    final List<Map<String, dynamic>> result = await db.rawQuery('''
+      SELECT strftime('%w', created_at) as day_index, SUM(amount) as total
+      FROM contributions
+      WHERE created_at BETWEEN ? AND ?
+      GROUP BY day_index
+    ''', [startOfWeek.toIso8601String(), endOfWeek.add(const Duration(days: 1)).toIso8601String()]);
+
+    Map<int, double> activity = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0};
+
+    for (var row in result) {
+      int dbDay = int.parse(row['day_index'].toString());
+      int weekDay = dbDay == 0 ? 7 : dbDay;
+      activity[weekDay] = (row['total'] as num).toDouble();
+    }
+    return activity;
+  }
+
+  Future<Map<String, double>> getGoalDistribution() async {
+    final db = await database;
+    final result = await db.rawQuery('''
+      SELECT g.title, SUM(c.amount) as total
+      FROM contributions c
+      JOIN goals g ON c.goal_id = g.id
+      GROUP BY g.title
+    ''');
+
+    Map<String, double> distribution = {};
+    for (var row in result) {
+      distribution[row['title'].toString()] = (row['total'] as num).toDouble();
+    }
+    return distribution;
+  }
+
+  Future<int> getStreak() async {
+    final db = await database;
+    final result = await db.rawQuery('''
+      SELECT DISTINCT date(created_at) as day
+      FROM contributions
+      ORDER BY day DESC
+    ''');
+
+    if (result.isEmpty) return 0;
+
+    int streak = 0;
+    DateTime checkDate = DateTime.now();
+    String todayStr = checkDate.toIso8601String().split('T')[0];
+    bool todaySaved = result.any((row) => row['day'] == todayStr);
+
+    if (!todaySaved) {
+      checkDate = checkDate.subtract(const Duration(days: 1));
+    }
+
+    for (var row in result) {
+      String dbDate = row['day'].toString();
+      String expectedDate = checkDate.toIso8601String().split('T')[0];
+
+      if (dbDate == expectedDate) {
+        streak++;
+        checkDate = checkDate.subtract(const Duration(days: 1));
+      } else if (DateTime.parse(dbDate).isAfter(checkDate)) {
+        continue;
+      } else {
+        break;
+      }
+    }
+    return streak;
+  }
+
+  Future<double> getDailyAverage() async {
+    final db = await database;
+    final firstDeposit = await db.rawQuery('SELECT MIN(created_at) as first_day FROM contributions');
+    final total = await getTotalBalance();
+
+    if (firstDeposit.first['first_day'] == null || total == 0) return 0.0;
+
+    DateTime start = DateTime.parse(firstDeposit.first['first_day'].toString());
+    int daysDiff = DateTime.now().difference(start).inDays + 1;
+
+    return total / daysDiff;
+  }
 }
