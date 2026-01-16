@@ -299,7 +299,7 @@ class DatabaseHelper {
   Future<List<Map<String, dynamic>>> getAllTransactions() async {
     final db = await database;
     return await db.rawQuery('''
-      SELECT c.id, c.amount, c.created_at, c.source, g.title as goal_title 
+      SELECT c.id, c.amount, c.created_at, c.source, g.title as goal_title, g.image_path, c.note
       FROM contributions c
       INNER JOIN goals g ON c.goal_id = g.id
       ORDER BY c.created_at DESC

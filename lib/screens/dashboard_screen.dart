@@ -8,6 +8,7 @@ import 'dart:io';
 import 'all_goals_screen.dart';
 import 'add_saving_screen.dart';
 import 'statistics_screen.dart';
+import 'passbook_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -23,6 +24,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _totalBalance = 0.0;
   List<Map<String, dynamic>> _goals = [];
   bool _isLoading = true;
+  int _refreshTrigger = 0;
 
   @override
   void initState() {
@@ -44,6 +46,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _goals = goals;
         _totalBalance = total;
         _isLoading = false;
+        _refreshTrigger++;
       });
     }
   }
@@ -368,12 +371,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
 
       // SWITCH BETWEEN DASHBOARD AND STATISTICS
-      body: _selectedIndex == 0
-          ? _buildDashboardUI()
-          : _selectedIndex == 1
-              ? const StatisticsScreen()
-              : Center(child: Text("Feature coming soon", style: GoogleFonts.poppins(color: Colors.white))),
-
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: [
+          _buildDashboardUI(),
+          StatisticsScreen(),
+          PassbookScreen(refreshTrigger: _refreshTrigger),
+        ],
+      ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(border: Border(top: BorderSide(color: Colors.white10, width: 1))),
         child: BottomNavigationBar(
@@ -386,7 +391,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           items: const [
             BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: "Home"),
             BottomNavigationBarItem(icon: Icon(Icons.pie_chart), label: "Stats"),
-            BottomNavigationBarItem(icon: Icon(Icons.wallet), label: "Wallet"),
+            BottomNavigationBarItem(icon: Icon(Icons.wallet), label: "Passbook"),
             BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
           ],
         ),
