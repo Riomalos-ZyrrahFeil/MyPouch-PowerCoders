@@ -28,7 +28,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 3, 
+      version: 4, 
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
       onOpen: (db) {
@@ -55,7 +55,6 @@ class DatabaseHelper {
       )
     ''');
 
-    // Goals table
     await db.execute('''
       CREATE TABLE goals (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -72,7 +71,6 @@ class DatabaseHelper {
       )
     ''');
 
-    // Contributions table
     await db.execute('''
       CREATE TABLE contributions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,6 +82,16 @@ class DatabaseHelper {
         FOREIGN KEY (goal_id) REFERENCES goals(id) ON DELETE CASCADE
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL,
+        date TEXT NOT NULL,
+        is_read INTEGER DEFAULT 0
+      )
+    ''');
     
     debugPrint('=== DATABASE TABLES CREATED SUCCESSFULLY ===');
   }
@@ -91,21 +99,36 @@ class DatabaseHelper {
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     debugPrint("=== UPGRADING DATABASE from $oldVersion to $newVersion ===");
     
-    // Helper to check if column exists
+    Future<bool> tableExists(String table) async {
+      var res = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='$table'");
+      return res.isNotEmpty;
+    }
+
     Future<bool> columnExists(String tableName, String columnName) async {
       var res = await db.rawQuery("PRAGMA table_info($tableName)");
       return res.any((row) => row['name'] == columnName);
     }
 
-    // Version 2: Money Source
-    if (oldVersion < 2) {
+    if (!await tableExists('notifications')) {
+      await db.execute('''
+        CREATE TABLE notifications (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          title TEXT NOT NULL,
+          body TEXT NOT NULL,
+          date TEXT NOT NULL,
+          is_read INTEGER DEFAULT 0
+        )
+      ''');
+      debugPrint("Created notifications table");
+    }
+
+    if (await tableExists('contributions')) {
       if (!await columnExists('contributions', 'source')) {
         try { await db.execute('ALTER TABLE contributions ADD COLUMN source TEXT'); } catch (_) {}
       }
     }
-
-    // Version 3: Profile Bio & Image (For Edit Profile)
-    if (oldVersion < 3) {
+    
+    if (await tableExists('users')) {
       if (!await columnExists('users', 'bio')) {
         try { await db.execute('ALTER TABLE users ADD COLUMN bio TEXT'); } catch (_) {}
       }
@@ -267,14 +290,14 @@ class DatabaseHelper {
   }
 
   Future<List<Map<String, dynamic>>> getAllTransactions() async {
-    final db = await database;
-    return await db.rawQuery('''
-      SELECT c.id, c.amount, c.created_at, c.source, g.title as goal_title, c.note
-      FROM contributions c
-      INNER JOIN goals g ON c.goal_id = g.id
-      ORDER BY c.created_at DESC
-    ''');
-  }
+      final db = await database;
+      return await db.rawQuery('''
+        SELECT c.id, c.amount, c.created_at, c.source, g.title as goal_title 
+        FROM contributions c
+        INNER JOIN goals g ON c.goal_id = g.id
+        ORDER BY c.created_at DESC
+      ''');
+    }
 
   Future<int> updateGoal({
     required int id,
@@ -513,5 +536,20 @@ Future<void> importDataFromJson(String jsonString) async {
         }
       }
     });
+  }
+
+  Future<int> addNotification(String title, String body) async {
+    final db = await database;
+    return await db.insert('notifications', {
+      'title': title,
+      'body': body,
+      'date': DateTime.now().toIso8601String(),
+      'is_read': 0,
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> getAllNotifications() async {
+    final db = await database;
+    return await db.query('notifications', orderBy: 'date DESC');
   }
 }
