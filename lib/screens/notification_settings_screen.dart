@@ -36,23 +36,35 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     await prefs.setBool('daily_reminder', value);
 
     if (value) {
-      // 1. Request Permission first
+      // 1. Request Permission
       final granted = await NotificationService().requestPermissions();
+      
       if (granted) {
-        // 2. Schedule
-        await NotificationService().scheduleDailyNotification(
-          id: 1,
-          title: "Time to Save! 💰",
-          body: "Don't break your streak. Add to your pouch today.",
-          time: _reminderTime,
-        );
+        // 2. Schedule Notification
+        await _scheduleNotification();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Daily reminder enabled!")),
+          );
+        }
       } else {
-        // Handle permission denied (optional: show snackbar)
+        // Permission denied, revert switch
         setState(() => _isDailyReminderEnabled = false);
+        await prefs.setBool('daily_reminder', false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Permission required to show notifications.")),
+          );
+        }
       }
     } else {
-      // Cancel
+      // 3. Cancel Notification
       await NotificationService().cancelAll();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Daily reminder disabled.")),
+        );
+      }
     }
   }
 
@@ -81,16 +93,21 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       await prefs.setInt('reminder_hour', picked.hour);
       await prefs.setInt('reminder_minute', picked.minute);
 
-      // Reschedule if enabled
+      // If enabled, reschedule with new time
       if (_isDailyReminderEnabled) {
-        await NotificationService().scheduleDailyNotification(
-          id: 1,
-          title: "Time to Save! 💰",
-          body: "Don't break your streak. Add to your pouch today.",
-          time: picked,
-        );
+        await NotificationService().cancelAll(); // Clear old time
+        await _scheduleNotification(); // Set new time
       }
     }
+  }
+
+  Future<void> _scheduleNotification() async {
+    await NotificationService().scheduleDailyNotification(
+      id: 1,
+      title: "Time to Save! 💰",
+      body: "Don't break your streak. Add to your pouch today.",
+      time: _reminderTime,
+    );
   }
 
   @override
@@ -110,30 +127,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
         padding: const EdgeInsets.all(24.0),
         child: Column(
           children: [
-            // Info Card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white10),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.notifications_active_outlined, color: Color(0xFF238E5F), size: 30),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      "Local Notifications help you stay consistent with your savings. No internet required.",
-                      style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Toggle Switch
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
@@ -151,7 +144,6 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
             
             const SizedBox(height: 16),
 
-            // Time Picker (Only show if enabled)
             if (_isDailyReminderEnabled)
               GestureDetector(
                 onTap: _pickTime,
@@ -180,6 +172,22 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                   ),
                 ),
               ),
+// ... (rest of your build code)
+
+            const Spacer(),
+            
+            // TEST BUTTON
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () {
+                  NotificationService().showInstantNotification();
+                },
+                style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.white24)),
+                child: Text("Test Notification Now", style: GoogleFonts.poppins(color: Colors.white)),
+              ),
+            ),
+            const SizedBox(height: 20),
           ],
         ),
       ),

@@ -2,6 +2,9 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
+import 'database_helper.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -12,19 +15,36 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   Future<void> init() async {
-    // 1. Initialize Timezones
     tz.initializeTimeZones();
+    String timeZoneName = 'UTC'; 
+    try {
+      final dynamic result = await FlutterTimezone.getLocalTimezone();
+      timeZoneName = result.toString();
+      if (timeZoneName.contains('TimezoneInfo')) {
+        timeZoneName = timeZoneName.replaceAll('TimezoneInfo(', '').replaceAll(')', '');
+        if (timeZoneName.contains(',')) {
+        }
+      }
+    } catch (e) {
+      debugPrint("Timezone Error: $e");
+    }
 
-    // 2. Android Settings
+    try {
+      tz.setLocalLocation(tz.getLocation(timeZoneName));
+      debugPrint("✅ Timezone set to: $timeZoneName");
+    } catch (e) {
+      debugPrint("⚠️ Could not set location '$timeZoneName'. Defaulting to UTC.");
+      tz.setLocalLocation(tz.getLocation('UTC'));
+    }
+
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    // 3. iOS Settings
     const DarwinInitializationSettings initializationSettingsDarwin =
         DarwinInitializationSettings(
-      requestSoundPermission: false,
-      requestBadgePermission: false,
-      requestAlertPermission: false,
+      requestSoundPermission: true,
+      requestBadgePermission: true,
+      requestAlertPermission: true,
     );
 
     const InitializationSettings initializationSettings = InitializationSettings(
@@ -32,44 +52,26 @@ class NotificationService {
       iOS: initializationSettingsDarwin,
     );
 
-    // 4. Initialize Plugin
-    await flutterLocalNotificationsPlugin.initialize(
-      initializationSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse response) {
-        // Handle logic when user clicks notification (e.g., go to Add Savings)
-        debugPrint("Notification clicked payload: ${response.payload}");
-      },
-    );
+    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
   }
 
-  // Request Permissions (Call this when enabling notifications)
   Future<bool> requestPermissions() async {
-    bool? androidGranted = false;
-    bool? iosGranted = false;
+    if (await Permission.notification.isDenied) {
+      await Permission.notification.request();
+    }
 
-    // Android 13+
-    final androidImplementation = flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+    var status = await Permission.scheduleExactAlarm.status;
+    if (status.isDenied) {
+       debugPrint("Requesting Exact Alarm permission...");
+       status = await Permission.scheduleExactAlarm.request();
+    }
     
-    if (androidImplementation != null) {
-      androidGranted = await androidImplementation.requestNotificationsPermission();
+    if (status.isPermanentlyDenied) {
+      debugPrint("Exact Alarm permission permanently denied. Open settings.");
+      await openAppSettings(); 
     }
 
-    // iOS
-    final iosImplementation = flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-            IOSFlutterLocalNotificationsPlugin>();
-            
-    if (iosImplementation != null) {
-      iosGranted = await iosImplementation.requestPermissions(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
-    }
-
-    return (androidGranted ?? false) || (iosGranted ?? false);
+    return true;
   }
 
   // Schedule Daily Reminder
@@ -79,43 +81,65 @@ class NotificationService {
     required String body,
     required TimeOfDay time,
   }) async {
-    await flutterLocalNotificationsPlugin.zonedSchedule(
-      id,
-      title,
-      body,
-      _nextInstanceOfTime(time),
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'daily_reminder_channel',
-          'Daily Reminders',
-          channelDescription: 'Reminds you to save money every day',
-          importance: Importance.max,
-          priority: Priority.high,
-          color: Color(0xFF015940),
+    try {
+      final now = tz.TZDateTime.now(tz.local);
+      var scheduledDate = tz.TZDateTime(
+        tz.local, now.year, now.month, now.day, time.hour, time.minute);
+
+      if (scheduledDate.isBefore(now)) {
+        scheduledDate = scheduledDate.add(const Duration(days: 1));
+      }
+
+      await flutterLocalNotificationsPlugin.zonedSchedule(
+        id,
+        title,
+        body,
+        scheduledDate,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'daily_reminder_channel',
+            'Daily Reminders',
+            channelDescription: 'Reminds you to save money every day',
+            importance: Importance.max,
+            priority: Priority.high,
+            color: Color(0xFF015940),
+          ),
+          iOS: DarwinNotificationDetails(),
         ),
-        iOS: DarwinNotificationDetails(),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.time, // Repeats daily at this time
-    );
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time, 
+      );
+      debugPrint("✅ Notification Scheduled for $scheduledDate");
+    } catch (e) {
+      debugPrint("❌ Error scheduling: $e");
+    }
   }
 
-  // Cancel Notifications
   Future<void> cancelAll() async {
     await flutterLocalNotificationsPlugin.cancelAll();
   }
+  
+  Future<void> showInstantNotification() async {
+    const title = 'Test Notification';
+    const body = 'This is a test to confirm notifications are working!';
 
-  // Helper to get next instance of a specific time (e.g., 8:00 PM)
-  tz.TZDateTime _nextInstanceOfTime(TimeOfDay time) {
-    final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
-    tz.TZDateTime scheduledDate = tz.TZDateTime(
-        tz.local, now.year, now.month, now.day, time.hour, time.minute);
-    
-    if (scheduledDate.isBefore(now)) {
-      scheduledDate = scheduledDate.add(const Duration(days: 1));
-    }
-    return scheduledDate;
+    await flutterLocalNotificationsPlugin.show(
+      0,
+      title,
+      body,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'test_channel',
+          'Test Notifications',
+          importance: Importance.max,
+          priority: Priority.high,
+        ),
+      ),
+    );
+
+    await DatabaseHelper().addNotification(title, body);
   }
 }

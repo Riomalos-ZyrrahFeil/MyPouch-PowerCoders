@@ -28,7 +28,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 3, 
+      version: 4, 
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
       onOpen: (db) {
@@ -55,7 +55,6 @@ class DatabaseHelper {
       )
     ''');
 
-    // Goals table
     await db.execute('''
       CREATE TABLE goals (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -72,7 +71,6 @@ class DatabaseHelper {
       )
     ''');
 
-    // Contributions table
     await db.execute('''
       CREATE TABLE contributions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,6 +82,16 @@ class DatabaseHelper {
         FOREIGN KEY (goal_id) REFERENCES goals(id) ON DELETE CASCADE
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT NOT NULL,
+        body TEXT NOT NULL,
+        date TEXT NOT NULL,
+        is_read INTEGER DEFAULT 0
+      )
+    ''');
     
     debugPrint('=== DATABASE TABLES CREATED SUCCESSFULLY ===');
   }
@@ -91,21 +99,36 @@ class DatabaseHelper {
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     debugPrint("=== UPGRADING DATABASE from $oldVersion to $newVersion ===");
     
-    // Helper to check if column exists
+    Future<bool> tableExists(String table) async {
+      var res = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name='$table'");
+      return res.isNotEmpty;
+    }
+
     Future<bool> columnExists(String tableName, String columnName) async {
       var res = await db.rawQuery("PRAGMA table_info($tableName)");
       return res.any((row) => row['name'] == columnName);
     }
 
-    // Version 2: Money Source
-    if (oldVersion < 2) {
+    if (!await tableExists('notifications')) {
+      await db.execute('''
+        CREATE TABLE notifications (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          title TEXT NOT NULL,
+          body TEXT NOT NULL,
+          date TEXT NOT NULL,
+          is_read INTEGER DEFAULT 0
+        )
+      ''');
+      debugPrint("Created notifications table");
+    }
+
+    if (await tableExists('contributions')) {
       if (!await columnExists('contributions', 'source')) {
         try { await db.execute('ALTER TABLE contributions ADD COLUMN source TEXT'); } catch (_) {}
       }
     }
-
-    // Version 3: Profile Bio & Image (For Edit Profile)
-    if (oldVersion < 3) {
+    
+    if (await tableExists('users')) {
       if (!await columnExists('users', 'bio')) {
         try { await db.execute('ALTER TABLE users ADD COLUMN bio TEXT'); } catch (_) {}
       }
@@ -267,14 +290,14 @@ class DatabaseHelper {
   }
 
   Future<List<Map<String, dynamic>>> getAllTransactions() async {
-    final db = await database;
-    return await db.rawQuery('''
-      SELECT c.id, c.amount, c.created_at, c.source, g.title as goal_title, g.image_path, c.note
-      FROM contributions c
-      INNER JOIN goals g ON c.goal_id = g.id
-      ORDER BY c.created_at DESC
-    ''');
-  }
+      final db = await database;
+      return await db.rawQuery('''
+        SELECT c.id, c.amount, c.created_at, c.source, g.title as goal_title 
+        FROM contributions c
+        INNER JOIN goals g ON c.goal_id = g.id
+        ORDER BY c.created_at DESC
+      ''');
+    }
 
   Future<int> updateGoal({
     required int id,
@@ -323,25 +346,56 @@ class DatabaseHelper {
 
   // --- STATS METHODS ---
 
-  Future<Map<int, double>> getWeeklyActivity() async {
+  Future<Map<int, double>> getActivityData(int filterIndex) async {
     final db = await database;
     final now = DateTime.now();
-    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-    final endOfWeek = startOfWeek.add(const Duration(days: 6));
+    
+    String groupBy;
+    String dateFilter;
+    int rangeStart;
+    int rangeEnd;
 
-    final List<Map<String, dynamic>> result = await db.rawQuery('''
-      SELECT strftime('%w', created_at) as day_index, SUM(amount) as total
+    if (filterIndex == 1) { 
+      final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+      final endOfWeek = startOfWeek.add(const Duration(days: 6));
+      
+      groupBy = "strftime('%w', created_at)"; 
+      dateFilter = "created_at BETWEEN '${startOfWeek.toIso8601String()}' AND '${endOfWeek.add(const Duration(days: 1)).toIso8601String()}'";
+      rangeStart = 1; 
+      rangeEnd = 7;
+      
+    } else if (filterIndex == 2) { 
+      groupBy = "strftime('%d', created_at)";
+      dateFilter = "created_at >= date('now', 'start of month')";
+      rangeStart = 1;
+      rangeEnd = 31;
+
+    } else { 
+      groupBy = "strftime('%m', created_at)";
+      dateFilter = "created_at >= date('now', 'start of year')";
+      rangeStart = 1;
+      rangeEnd = 12;
+    }
+
+    final result = await db.rawQuery('''
+      SELECT $groupBy as time_unit, SUM(amount) as total
       FROM contributions
-      WHERE created_at BETWEEN ? AND ?
-      GROUP BY day_index
-    ''', [startOfWeek.toIso8601String(), endOfWeek.add(const Duration(days: 1)).toIso8601String()]);
+      WHERE $dateFilter
+      GROUP BY time_unit
+    ''');
 
-    Map<int, double> activity = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0};
+    Map<int, double> activity = {};
+    for (int i = rangeStart; i <= rangeEnd; i++) {
+      activity[i] = 0.0;
+    }
 
     for (var row in result) {
-      int dbDay = int.parse(row['day_index'].toString());
-      int weekDay = dbDay == 0 ? 7 : dbDay;
-      activity[weekDay] = (row['total'] as num).toDouble();
+      int unit = int.tryParse(row['time_unit'].toString()) ?? 0;
+      if (filterIndex == 1 && unit == 0) unit = 7;
+      
+      if (activity.containsKey(unit)) {
+        activity[unit] = (row['total'] as num).toDouble();
+      }
     }
     return activity;
   }
@@ -357,11 +411,13 @@ class DatabaseHelper {
 
     Map<String, double> distribution = {};
     for (var row in result) {
-      distribution[row['title'].toString()] = (row['total'] as num).toDouble();
+      if (row['total'] != null) {
+        distribution[row['title'].toString()] = (row['total'] as num).toDouble();
+      }
     }
     return distribution;
   }
-
+  
   Future<int> getStreak() async {
     final db = await database;
     final result = await db.rawQuery('''
@@ -513,5 +569,20 @@ Future<void> importDataFromJson(String jsonString) async {
         }
       }
     });
+  }
+
+  Future<int> addNotification(String title, String body) async {
+    final db = await database;
+    return await db.insert('notifications', {
+      'title': title,
+      'body': body,
+      'date': DateTime.now().toIso8601String(),
+      'is_read': 0,
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> getAllNotifications() async {
+    final db = await database;
+    return await db.query('notifications', orderBy: 'date DESC');
   }
 }
