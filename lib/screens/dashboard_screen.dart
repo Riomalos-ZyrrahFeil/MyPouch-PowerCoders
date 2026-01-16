@@ -8,6 +8,7 @@ import 'dart:io';
 import 'all_goals_screen.dart';
 import 'add_saving_screen.dart';
 import 'statistics_screen.dart';
+import 'passbook_screen.dart';
 import 'notifications_screen.dart'; // ADD THIS IMPORT
 import 'profile_screen.dart'; // ADD THIS IMPORT
 
@@ -25,6 +26,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _totalBalance = 0.0;
   List<Map<String, dynamic>> _goals = [];
   bool _isLoading = true;
+  int _refreshTrigger = 0;
 
   @override
   void initState() {
@@ -46,6 +48,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _goals = goals;
         _totalBalance = total;
         _isLoading = false;
+        _refreshTrigger++;
       });
     }
   }
@@ -357,7 +360,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         children: [
           _buildDashboardUI(),       // Index 0: Home
           StatisticsScreen(),        // Index 1: Stats
-          Center(child: Text("Wallet Feature Coming Soon", style: GoogleFonts.poppins(color: Colors.white))), // Index 2: Wallet
+          PassbookScreen(refreshTrigger: _refreshTrigger), // Index 2: Wallet
           const ProfileScreen(),     // Index 3: Profile (With Settings)
         ],
       ),
@@ -374,8 +377,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           items: const [
             BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: "Home"),
             BottomNavigationBarItem(icon: Icon(Icons.pie_chart), label: "Stats"),
-            BottomNavigationBarItem(icon: Icon(Icons.wallet), label: "Wallet"),
-            BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"), // Shows ProfileScreen
+            BottomNavigationBarItem(icon: Icon(Icons.wallet), label: "Passbook"),
+            BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
           ],
         ),
       ),
