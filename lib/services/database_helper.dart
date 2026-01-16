@@ -346,25 +346,56 @@ class DatabaseHelper {
 
   // --- STATS METHODS ---
 
-  Future<Map<int, double>> getWeeklyActivity() async {
+  Future<Map<int, double>> getActivityData(int filterIndex) async {
     final db = await database;
     final now = DateTime.now();
-    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-    final endOfWeek = startOfWeek.add(const Duration(days: 6));
+    
+    String groupBy;
+    String dateFilter;
+    int rangeStart;
+    int rangeEnd;
 
-    final List<Map<String, dynamic>> result = await db.rawQuery('''
-      SELECT strftime('%w', created_at) as day_index, SUM(amount) as total
+    if (filterIndex == 1) { 
+      final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+      final endOfWeek = startOfWeek.add(const Duration(days: 6));
+      
+      groupBy = "strftime('%w', created_at)"; 
+      dateFilter = "created_at BETWEEN '${startOfWeek.toIso8601String()}' AND '${endOfWeek.add(const Duration(days: 1)).toIso8601String()}'";
+      rangeStart = 1; 
+      rangeEnd = 7;
+      
+    } else if (filterIndex == 2) { 
+      groupBy = "strftime('%d', created_at)";
+      dateFilter = "created_at >= date('now', 'start of month')";
+      rangeStart = 1;
+      rangeEnd = 31;
+
+    } else { 
+      groupBy = "strftime('%m', created_at)";
+      dateFilter = "created_at >= date('now', 'start of year')";
+      rangeStart = 1;
+      rangeEnd = 12;
+    }
+
+    final result = await db.rawQuery('''
+      SELECT $groupBy as time_unit, SUM(amount) as total
       FROM contributions
-      WHERE created_at BETWEEN ? AND ?
-      GROUP BY day_index
-    ''', [startOfWeek.toIso8601String(), endOfWeek.add(const Duration(days: 1)).toIso8601String()]);
+      WHERE $dateFilter
+      GROUP BY time_unit
+    ''');
 
-    Map<int, double> activity = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0};
+    Map<int, double> activity = {};
+    for (int i = rangeStart; i <= rangeEnd; i++) {
+      activity[i] = 0.0;
+    }
 
     for (var row in result) {
-      int dbDay = int.parse(row['day_index'].toString());
-      int weekDay = dbDay == 0 ? 7 : dbDay;
-      activity[weekDay] = (row['total'] as num).toDouble();
+      int unit = int.tryParse(row['time_unit'].toString()) ?? 0;
+      if (filterIndex == 1 && unit == 0) unit = 7;
+      
+      if (activity.containsKey(unit)) {
+        activity[unit] = (row['total'] as num).toDouble();
+      }
     }
     return activity;
   }
@@ -380,11 +411,13 @@ class DatabaseHelper {
 
     Map<String, double> distribution = {};
     for (var row in result) {
-      distribution[row['title'].toString()] = (row['total'] as num).toDouble();
+      if (row['total'] != null) {
+        distribution[row['title'].toString()] = (row['total'] as num).toDouble();
+      }
     }
     return distribution;
   }
-
+  
   Future<int> getStreak() async {
     final db = await database;
     final result = await db.rawQuery('''
