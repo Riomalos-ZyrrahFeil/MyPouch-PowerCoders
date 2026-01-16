@@ -9,6 +9,8 @@ import 'all_goals_screen.dart';
 import 'add_saving_screen.dart';
 import 'statistics_screen.dart';
 import 'passbook_screen.dart';
+import 'notifications_screen.dart'; // ADD THIS IMPORT
+import 'profile_screen.dart'; // ADD THIS IMPORT
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -68,6 +70,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildDashboardUI() {
+    // ... (This code remains exactly the same as previous steps)
+    // Just copying the structure for context:
     return Column(
       children: [
         Expanded(
@@ -78,7 +82,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // TOTAL SAVINGS CARD
+                  // ... Total Savings Card ...
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(24),
@@ -102,8 +106,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             Text("Total Saved", style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14)),
                             InkWell(
                               onTap: () {
-                                 Navigator.push(context, MaterialPageRoute(
-                                   builder: (context) => const TransactionHistoryScreen(isGlobal: true)));
+                                   Navigator.push(context, MaterialPageRoute(
+                                     builder: (context) => const TransactionHistoryScreen(isGlobal: true)));
                               },
                               child: Container(
                                 padding: const EdgeInsets.all(6),
@@ -118,11 +122,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              "₱ ${_totalBalance.toStringAsFixed(2)}",
+                              "₱ ${_totalBalance.toStringAsFixed(2)}", 
                               style: GoogleFonts.poppins(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)
                             ),
                             FloatingActionButton.small(
-                              onPressed: _showAddMoneyDialog,
+                              onPressed: _showAddMoneyDialog, 
                               backgroundColor: Colors.white,
                               heroTag: "add_money",
                               child: const Icon(Icons.add, color: Color(0xFF015940)),
@@ -146,7 +150,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             context,
                             MaterialPageRoute(builder: (context) => const AllGoalsScreen()),
                           ).then((_) => _loadDashboardData());
-                        },
+                        }, 
                         child: Text("View All", style: GoogleFonts.poppins(color: const Color(0xFF238E5F))),
                       ),
                     ],
@@ -165,13 +169,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     )
                   else
                     ListView.builder(
-                      physics: const NeverScrollableScrollPhysics(),
+                      physics: const NeverScrollableScrollPhysics(), 
                       shrinkWrap: true,
                       itemCount: _goals.length,
                       itemBuilder: (context, index) {
                         final goal = _goals[index];
                         final progress = (goal['current_amount'] / goal['target_amount']).clamp(0.0, 1.0);
-                       
                         return _buildGoalCard(context, goal, progress);
                       },
                     ),
@@ -194,7 +197,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onPressed: () async {
                 final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => const AddGoalScreen()));
                 if (result == true) {
-                  _loadDashboardData();
+                  _loadDashboardData(); 
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -204,7 +207,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               icon: const Icon(Icons.add_task, color: Colors.white),
               label: Text(
-                "Add New Goal",
+                "Add New Goal", 
                 style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)
               ),
             ),
@@ -215,8 +218,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildGoalCard(BuildContext context, Map<String, dynamic> goal, double progress) {
+    // ... (Keep existing goal card logic)
     String imagePath = goal['image_path'] ?? 'assets/walkthrough.jpg';
- 
     return GestureDetector(
       onTap: () async {
         await Navigator.push(context, MaterialPageRoute(builder: (context) => GoalDetailsScreen(
@@ -227,7 +230,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           progress: progress,
           imagePath: imagePath,
         )));
-        _loadDashboardData();
+        _loadDashboardData(); 
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
@@ -244,8 +247,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 image: DecorationImage(
-                  image: imagePath.startsWith('assets/')
-                      ? AssetImage(imagePath) as ImageProvider
+                  image: imagePath.startsWith('assets/') 
+                      ? AssetImage(imagePath) as ImageProvider 
                       : FileImage(File(imagePath)),
                   fit: BoxFit.cover
                 ),
@@ -261,7 +264,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          goal['title'],
+                          goal['title'], 
                           style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -275,12 +278,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           color: const Color(0xFF01140E),
                           onSelected: (value) async {
                             if (value == 'edit') {
-                              final result = await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => AddGoalScreen(goal: goal)
-                                )
-                              );
+                              final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => AddGoalScreen(goal: goal)));
                               if (result == true) _loadDashboardData();
                             } else if (value == 'delete') {
                               showDialog(
@@ -290,17 +288,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   title: Text("Delete Goal?", style: GoogleFonts.poppins(color: Colors.white)),
                                   content: Text("Are you sure you want to delete '${goal['title']}'?", style: GoogleFonts.poppins(color: Colors.white70)),
                                   actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(ctx),
-                                      child: const Text("Cancel", style: TextStyle(color: Colors.grey))
-                                    ),
-                                    TextButton(
-                                      onPressed: () {
-                                        Navigator.pop(ctx);
-                                        _deleteGoal(goal['id']);
-                                      },
-                                      child: const Text("Delete", style: TextStyle(color: Colors.redAccent))
-                                    ),
+                                    TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancel", style: TextStyle(color: Colors.grey))),
+                                    TextButton(onPressed: () {Navigator.pop(ctx); _deleteGoal(goal['id']);}, child: const Text("Delete", style: TextStyle(color: Colors.redAccent))),
                                   ],
                                 )
                               );
@@ -315,22 +304,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: progress, minHeight: 6,
-                      backgroundColor: Colors.white12,
-                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF238E5F)),
-                    ),
-                  ),
+                  ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: progress, minHeight: 6, backgroundColor: Colors.white12, valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF238E5F)))),
                   const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text("₱${goal['current_amount']}", style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12)),
-                      Text("${(progress * 100).toInt()}%", style: GoogleFonts.poppins(color: const Color(0xFF238E5F), fontSize: 12, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
+                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                    Text("₱${goal['current_amount']}", style: GoogleFonts.poppins(color: Colors.white70, fontSize: 12)),
+                    Text("${(progress * 100).toInt()}%", style: GoogleFonts.poppins(color: const Color(0xFF238E5F), fontSize: 12, fontWeight: FontWeight.bold)),
+                  ]),
                 ],
               ),
             ),
@@ -340,7 +319,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -349,7 +327,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
-        title: _selectedIndex == 0
+        title: _selectedIndex == 0 
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -364,21 +342,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
             decoration: BoxDecoration(color: Colors.white12, borderRadius: BorderRadius.circular(12)),
             child: IconButton(
               icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-              onPressed: () {},
+              onPressed: () {
+                // FIXED: Navigate to Notifications Inbox (History)
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const NotificationsScreen()),
+                );
+              },
             ),
           )
         ],
       ),
 
-      // SWITCH BETWEEN DASHBOARD AND STATISTICS
+      // MAIN CONTENT SWITCHER
       body: IndexedStack(
         index: _selectedIndex,
         children: [
-          _buildDashboardUI(),
-          StatisticsScreen(),
-          PassbookScreen(refreshTrigger: _refreshTrigger),
+          _buildDashboardUI(),       // Index 0: Home
+          StatisticsScreen(),        // Index 1: Stats
+          PassbookScreen(refreshTrigger: _refreshTrigger), // Index 2: Wallet
+          const ProfileScreen(),     // Index 3: Profile (With Settings)
         ],
       ),
+
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(border: Border(top: BorderSide(color: Colors.white10, width: 1))),
         child: BottomNavigationBar(
